@@ -10,7 +10,7 @@
 int DEBUG_MODE = 0;
 
 // debug statements
-void debugf(const char *fmt, ...) {
+static void debugf(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     if (DEBUG_MODE) {
@@ -21,9 +21,8 @@ void debugf(const char *fmt, ...) {
 
 
 // function declarations
-int serial_dijkstra(int **adj_matrix, int n_nodes, int src, int *path_costs, int **paths);
-
-
+int serial_dijkstra(WEIGHT **adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors);
+int serial_bellman_ford(WEIGHT **adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors);
 
 int main(int argc, char **argv) {
 
@@ -43,63 +42,81 @@ int main(int argc, char **argv) {
     int n_edges = atoi(argv[2]);
     int max_weight = atoi(argv[3]);
 
-    int **adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
+    WEIGHT **adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
     if (adj_matrix == NULL) {
         exit(1);
     }
 
 
     // function signatures should look like
-    // int shortest_path(adj_matrix, n_nodes, source, int *path_costs, int **paths)
-    // path_costs and paths will be the outputs
-    //  path_costs[i] will be the cost of the shortest path going from source to i
+    // int shortest_path(adj_matrix, n_nodes, source, WEIGHT *distances, int **paths)
+    // distances and paths will be the outputs
+    //  distances[i] will be the cost of the shortest path going from source to i
     //  paths[i] will be the actual path. Each row in paths will have length n_nodes and will
-    //      essentially be "null-terminated" with the element i. If path_costs[i] is infinity, then
+    //      essentially be "null-terminated" with the element i. If distances[i] is infinity, then
     //      paths[i] is invalid.
 
-    //print_array(adj_matrix, n_nodes);
+    print_array(adj_matrix, n_nodes);
 
-    int *path_costs = calloc(n_nodes, sizeof(int));
+    int *predecessors = calloc(n_nodes, sizeof(int));
+
+    WEIGHT *dijkstra_distances = calloc(n_nodes, sizeof(WEIGHT));
+
     serial_dijkstra(adj_matrix,
                     n_nodes,
+                    n_edges,
                     0,
-                    path_costs,
-                    NULL);
+                    dijkstra_distances,
+                    predecessors);
 
-    printf("RESULTS!!!! to node 0\n");
+
+    WEIGHT *bf_distances = calloc(n_nodes, sizeof(WEIGHT));
+
+    serial_bellman_ford(adj_matrix,
+                    n_nodes,
+                    n_edges,
+                    0,
+                    bf_distances,
+                    predecessors);
+
+
+    // make sure they're the same!
+    // TODO: replace this with a norm
     for (int i = 0; i < n_nodes; i++) {
-        printf("%d ", path_costs[i]);
+        if (bf_distances[i] != dijkstra_distances[i]) {
+            printf("Disagreement at index %d! Dijkstras %d BF %d\n", i, dijkstra_distances[i], bf_distances[i]);
+        }
     }
-    printf("\n");
+    printf("Finished comparing! No diff!\n");
 
     ///////////////////////////////////////////////////////////////////////////
     ///  CLEAN UP
     ///////////////////////////////////////////////////////////////////////////
-
-    free(path_costs);
+    free(predecessors);
+    free(dijkstra_distances);
+    free(bf_distances);
     free_array(adj_matrix, n_nodes);
 
     return 0;
 }
 
 // returns 0 on success, -1 on failure for whatever reason.
-int serial_dijkstra(int **adj_matrix, int n_nodes, int src, int *path_costs, int **paths) {
+int serial_dijkstra(WEIGHT **adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors) {
     // first we need a distance vector type thing
-    int *previous = malloc(n_nodes *sizeof(int));
     MQNode **mqns = malloc(n_nodes * sizeof(MQNode)); // oh boy
-    path_costs[src] = 0;
+    distances[src] = 0;
 
     MinQueue *mq = mqueue_init(n_nodes);
 
     for (int v = 0; v < n_nodes; v++) {
         if (v != src) {
-            path_costs[v] = INT_MAX;  // doesn't feel too kosher but we're going with it
+            distances[v] = INT_MAX;  // doesn't feel too kosher but we're going with it
         }
-        previous[v] = -1;
+        predecessors[v] = -1;
         MQNode *mqn = malloc(sizeof(MQNode));
         mqns[v] = mqn;
         mqn->key = v;
-        mqn->val = path_costs[v];
+        mqn->val = distances[v];
         mqueue_insert(mq, mqn);
     }
 
@@ -111,14 +128,15 @@ int serial_dijkstra(int **adj_matrix, int n_nodes, int src, int *path_costs, int
             if (!adj_matrix[n][v]) {
                 continue;
             }
-            long alt_dist = path_costs[v] + adj_matrix[n][v];
-            debugf("For node %d, alt_dist %ld, path_costs %d, adj_matrix %d\n", n, alt_dist, path_costs[n], adj_matrix[n][v]);
-            if (path_costs[v] != INT_MAX && alt_dist < path_costs[n]) {
-                path_costs[n] = (int) alt_dist;
-                previous[n] = v;
+            long alt_dist = distances[v] + adj_matrix[n][v];
+            debugf("For node %d, alt_dist %ld, distances %d, adj_matrix %d\n", n, alt_dist, distances[n], adj_matrix[n][v]);
+            if (distances[v] != INT_MAX && alt_dist < distances[n]) {
+                distances[n] = (WEIGHT) alt_dist;
+                predecessors[n] = v;
                 mqueue_update_val(mq, mqns[n], alt_dist);
             }
         }
+        free(mqn);
     }
 
     ///////////////////////////////////////////////////////////////////
@@ -126,5 +144,62 @@ int serial_dijkstra(int **adj_matrix, int n_nodes, int src, int *path_costs, int
     ///////////////////////////////////////////////////////////////////
     mqueue_free(mq, 1);
     free(mqns);
+    return 0;
+}
+
+// returns 0 on success, -1 on failure for whatever reason.
+// TODO: fix BF. returning 0 for all distances.
+int serial_bellman_ford(WEIGHT **adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors) {
+    // preprocess once to convert adjacency matrix to edge list
+    typedef struct {
+        int n1;
+        int n2;
+        WEIGHT weight;
+    } Edge;
+
+    Edge *edges= calloc(n_edges, sizeof(Edge));
+
+    int e_i = 0;
+    for (int i = 0; i < n_nodes; i++) {
+        for (int j = i; j < n_nodes; j++) {
+            if (adj_matrix[i][j]) {
+                Edge e = {i, j};
+                edges[e_i++] = e;
+            }
+            if (e_i == n_edges) break;
+        }
+    }
+
+
+    // now that we have the edge list...
+    for (int i = 0; i < n_nodes; i++) {
+        distances[i] = INT_MAX;
+        predecessors[i] = -1;
+    }
+
+    distances[src] = 0;
+
+    for (int v = 1; v < n_nodes; v++){
+        for (int e = 0; e < n_edges; e++) {
+            int u = edges[e].n1;
+            int v = edges[e].n2;
+            WEIGHT w = edges[e].weight;
+            if (distances[u] + w < distances[v]) {
+                distances[v] = distances[u] + w;
+                predecessors[v] = u;
+            }
+            /*if (distances[v] + w < distances[u]) {*/
+                /*distances[u] = distances[v] + w;*/
+                /*predecessors[u] = v;*/
+            /*}*/
+        }
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // CLEAN UP
+    ////////////////////////////////////////////////////////////////////////////////
+    free(edges);
+
     return 0;
 }

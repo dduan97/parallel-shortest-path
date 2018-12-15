@@ -1,8 +1,9 @@
 #include <stdlib.h>
+#include "helpers.h"
 
 typedef struct {
     int key;
-    int val;
+    WEIGHT val;
     int idx;
 } MQNode;
 
@@ -22,6 +23,6 @@ MQNode *mqueue_pop_min(MinQueue *mq);
 
 int mqueue_is_empty(MinQueue *mq);
 
-void mqueue_update_val(MinQueue *mq, MQNode *mqn, int new_val);
+void mqueue_update_val(MinQueue *mq, MQNode *mqn, WEIGHT new_val);
 
 void mqueue_free(MinQueue *mq, int dynamic_nodes);

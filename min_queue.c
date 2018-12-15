@@ -83,7 +83,7 @@ int mqueue_is_empty(MinQueue *mq) {
     return (mq->n_items == 0);
 }
 
-void mqueue_update_val(MinQueue *mq, MQNode *mqn, int new_val) {
+void mqueue_update_val(MinQueue *mq, MQNode *mqn, WEIGHT new_val) {
     int i = mqn->idx;
     // increasing priority means moving down in the heap
     if (new_val > mqn->val) {

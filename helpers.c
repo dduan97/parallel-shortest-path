@@ -4,7 +4,7 @@
 // right now we're using integer weights
 #include "helpers.h"
 
-int **gen_graph(int n_nodes, int n_edges, int max_weight) {
+WEIGHT **gen_graph(int n_nodes, int n_edges, int max_weight) {
 
     if (n_edges > (n_nodes) * (n_nodes - 1) / 2) {
         printf("Too many edges!\n");
@@ -12,9 +12,9 @@ int **gen_graph(int n_nodes, int n_edges, int max_weight) {
     }
     srand(SEED);
     // initialize the adjacency matrix as a 2-D array
-    int **adj_matrix = malloc(n_nodes * sizeof(int*));
+    WEIGHT **adj_matrix = malloc(n_nodes * sizeof(WEIGHT*));
     for (int i = 0; i < n_nodes; i++) {
-        adj_matrix[i] = calloc(n_nodes, sizeof(int));
+        adj_matrix[i] = calloc(n_nodes, sizeof(WEIGHT));
     }
 
     // now we randomly select the adjacencies to put in the matrix
@@ -32,7 +32,7 @@ int **gen_graph(int n_nodes, int n_edges, int max_weight) {
         }
 
         // generate the weights, from 1 til max_weight (inclusive)
-        int weight = rand() % max_weight + 1;
+        int weight = (WEIGHT) (rand() * 1.0 / RAND_MAX * max_weight) + 1;
 
         adj_matrix[n1][n2] = adj_matrix[n2][n1] = weight;
         e++;
@@ -59,3 +59,23 @@ void free_array(int **arr, int dim) {
     }
     free(arr);
 }
+
+
+/// TIMING ROUTINES
+void timing_(double* wcTime, double* cpuTime)
+{
+   timing(wcTime, cpuTime);
+}
+
+void timing(double* wcTime, double* cpuTime)
+{
+   struct timeval tp;
+   struct rusage ruse;
+
+   gettimeofday(&tp, NULL);
+   *wcTime=(double) (tp.tv_sec + tp.tv_usec/1000000.0);
+
+   getrusage(RUSAGE_SELF, &ruse);
+   *cpuTime=(double)(ruse.ru_utime.tv_sec+ruse.ru_utime.tv_usec / 1000000.0);
+}
+
