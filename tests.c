@@ -44,8 +44,8 @@ int main(int argc, char **argv) {
     min = mqueue_pop_min(mq);
     printf("Got (%d %d)\n", min->key, min->val);
 
-    printf("Inserting (1,1)\n");
-    MQNode mqn1 = {1, 1};
+    printf("Inserting (11,1)\n");
+    MQNode mqn1 = {11, 1};
     mqueue_insert(mq, &mqn1);
 
     printf("popping min\n");
