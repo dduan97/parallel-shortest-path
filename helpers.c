@@ -4,7 +4,7 @@
 // right now we're using integer weights
 #include "helpers.h"
 
-WEIGHT **gen_graph(int n_nodes, int n_edges, int max_weight) {
+WEIGHT **gen_graph(size_t n_nodes, size_t n_edges, int max_weight) {
 
     if (n_edges > (n_nodes) * (n_nodes - 1) / 2) {
         printf("Too many edges!\n");
@@ -13,16 +13,16 @@ WEIGHT **gen_graph(int n_nodes, int n_edges, int max_weight) {
     srand(SEED);
     // initialize the adjacency matrix as a 2-D array
     WEIGHT **adj_matrix = malloc(n_nodes * sizeof(WEIGHT*));
-    for (int i = 0; i < n_nodes; i++) {
+    for (size_t i = 0; i < n_nodes; i++) {
         adj_matrix[i] = calloc(n_nodes, sizeof(WEIGHT));
     }
 
     // now we randomly select the adjacencies to put in the matrix
-    int e = 0;
+    size_t e = 0;
     while (e < n_edges) {
         // this isn't uniform but it sohuld suffice for our purposes
-        int n1 = rand() % n_nodes;
-        int n2 = rand() % n_nodes;
+        size_t n1 = (size_t) rand()*1.0 / RAND_MAX * n_nodes;
+        size_t n2 = (size_t) rand()*1.0 / RAND_MAX * n_nodes;
 
 
         // don't want to repeat an edge or put an edge between the same nodes
@@ -32,7 +32,7 @@ WEIGHT **gen_graph(int n_nodes, int n_edges, int max_weight) {
         }
 
         // generate the weights, from 1 til max_weight (inclusive)
-        int weight = (WEIGHT) (rand() * 1.0 / RAND_MAX * max_weight) + 1;
+        WEIGHT weight = (WEIGHT) (rand() * 1.0 / RAND_MAX * max_weight) + 1;
 
         adj_matrix[n1][n2] = adj_matrix[n2][n1] = weight;
         e++;
@@ -43,18 +43,18 @@ WEIGHT **gen_graph(int n_nodes, int n_edges, int max_weight) {
 
 
 // function for pretty printing a square 2-d array
-void print_array(int **arr, int dim) {
-    for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < dim; j++) {
-            printf("%d ", arr[i][j]);
+void print_array(WEIGHT**arr, size_t dim) {
+    for (size_t i = 0; i < dim; i++) {
+        for (size_t j = 0; j < dim; j++) {
+            printf("%4d ", arr[i][j]);
         }
         printf("\n");
     }
 }
 
 
-void free_array(int **arr, int dim) {
-    for (int i = 0; i < dim; i++) {
+void free_array(WEIGHT**arr, size_t dim) {
+    for (size_t i = 0; i < dim; i++) {
         free(arr[i]);
     }
     free(arr);
@@ -79,3 +79,12 @@ void timing(double* wcTime, double* cpuTime)
    *cpuTime=(double)(ruse.ru_utime.tv_sec+ruse.ru_utime.tv_usec / 1000000.0);
 }
 
+
+// error norm. I guess we'll use l1
+double l2_norm(WEIGHT *arr1, WEIGHT *arr2, size_t len) {
+    WEIGHT err = 0;
+    for (size_t i = 0; i < len; i++) {
+        err += (arr1[i] - arr2[i]) * (arr1[i] - arr2[i]);
+    }
+    return sqrt((double) err);
+}
