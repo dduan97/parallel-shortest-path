@@ -1,3 +1,6 @@
+#ifndef __MIN_QUEUE_H__
+#define __MIN_QUEUE_H__
+
 #include <stdlib.h>
 #include "helpers.h"
 
@@ -28,3 +31,5 @@ void mqueue_update_val(MinQueue *mq, MQNode *mqn, WEIGHT new_val);
 void mqueue_free(MinQueue *mq, int dynamic_nodes);
 
 void mqueue_print(MinQueue *mq);
+
+#endif

@@ -88,3 +88,22 @@ double l2_norm(WEIGHT *arr1, WEIGHT *arr2, size_t len) {
     }
     return sqrt((double) err);
 }
+
+void debug_init() {
+    // now we check for debug mode
+    if (getenv("DEBUG")) {
+        DEBUG_MODE = 1;
+        printf("INFO: running in debug mode...\n");
+    }
+}
+
+// debug statements
+void debugf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    if (DEBUG_MODE) {
+        printf("[DEBUG]: ");
+        vprintf(fmt, args);
+    }
+}
+

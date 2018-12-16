@@ -1,8 +1,10 @@
-// main file for serial versions
+#include <stdio.h>
+#include <limits.h>
+
+#include "helpers.h"
 #include "benchmarks.h"
 
-// function declarations
-void print_path(size_t *predecessors, size_t idx);
+int parallel_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors);
 
 int main(int argc, char **argv) {
 
@@ -37,13 +39,13 @@ int main(int argc, char **argv) {
     //print_array(adj_matrix, n_nodes);
 
     size_t *dijkstra_predecessors = calloc(n_nodes, sizeof(size_t));
-    size_t *bf_predecessors = calloc(n_nodes, sizeof(size_t));
+    size_t *serial_predecessors = calloc(n_nodes, sizeof(size_t));
 
     WEIGHT *dijkstra_distances = calloc(n_nodes, sizeof(WEIGHT));
 
 
     timing(&start_wall, &cpu);
-    serial_dijkstra(adj_matrix,
+    parallel_dijkstra(adj_matrix,
                     n_nodes,
                     n_edges,
                     0,
@@ -53,44 +55,44 @@ int main(int argc, char **argv) {
     timing(&end_wall, &cpu);
     printf("Dijkstra's time: %.4f\n", end_wall - start_wall);
 
-    WEIGHT *bf_distances = calloc(n_nodes, sizeof(WEIGHT));
+    WEIGHT *serial_distances = calloc(n_nodes, sizeof(WEIGHT));
 
     timing(&start_wall, &cpu);
-    serial_bellman_ford(adj_matrix,
+    serial_dijkstra(adj_matrix,
                     n_nodes,
                     n_edges,
                     0,
-                    bf_distances,
-                    bf_predecessors);
+                    serial_distances,
+                    serial_predecessors);
 
     timing(&end_wall, &cpu);
     printf("BF's time: %.4f\n", end_wall - start_wall);
 
-    // make sure they're the same!
-    // TODO: replace this with a norm
-    for (size_t i = 0; i < n_nodes; i++) {
-        if (bf_distances[i] != dijkstra_distances[i]) {
-            printf("Disagreement at index %zd! Dijkstras %d BF %d\n", i, dijkstra_distances[i], bf_distances[i]);
-            printf("\tDijkstra's path:\n\t\t");
-            print_path(dijkstra_predecessors, i);
-            printf("\n\tBF's path:\n\t\t");
-            print_path(bf_predecessors, i);
-            printf("\n\n");
-        }
-    }
+    // use the serial version to verify results
 
-    double l2 = l2_norm(dijkstra_distances, bf_distances, n_nodes);
+    double l2 = l2_norm(dijkstra_distances, serial_distances, n_nodes);
     printf("\n\nL2 Norm: %lf\n", l2);
 
     ///////////////////////////////////////////////////////////////////////////
     ///  CLEAN UP
     ///////////////////////////////////////////////////////////////////////////
     free(dijkstra_predecessors);
-    free(bf_predecessors);
+    free(serial_predecessors);
     free(dijkstra_distances);
-    free(bf_distances);
+    free(serial_distances);
     free_array(adj_matrix, n_nodes);
 
     return 0;
 }
 
+int parallel_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+    // same thing as serial, except...
+    // 1. Each processor gets assigned a "cluster" of nodes and maintains their own min heap
+    // 2. When we want our global min, each node reports their local min
+    //      and we aggregate to get our global min
+    // 3. We advertise the global min, and each processor updates their own nodes to check if they
+    //      need updating
+    // 4. Repeat until they are all empty
+    //
+    // For clarity, I will have one master node coordinating the action (as well as doing some calculations)
+}
