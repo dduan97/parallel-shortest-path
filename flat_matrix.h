@@ -2,6 +2,7 @@
 #define __FLAT_MATRIX_H__
 
 #include <stdlib.h>
+#include <stdio.h>
 #define WEIGHT int
 
 typedef struct {
@@ -18,5 +19,6 @@ FlatMatrix *flat_matrix_from_2d_arr(WEIGHT **arr, size_t width, size_t height);
 
 void flat_matrix_free(FlatMatrix *fm);
 
+void flat_matrix_print(FlatMatrix *fm);
 
 #endif

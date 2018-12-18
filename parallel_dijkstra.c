@@ -4,6 +4,7 @@
 
 #include "helpers.h"
 #include "benchmarks.h"
+#include "resultr.h"
 
 enum MPI_TAG {
     TAG_KEY,
@@ -71,21 +72,26 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        pprintf("About to scatter adj\n");
-        // we want to scatter. Since we store the matrix in row-major form, we can just
-        // take chunks of the adjacency matrix
-        int scatter_res = MPI_Scatter(adj_matrix->arr,
-                    nodes_per_proc * n_nodes,
-                    MPI_INT,
-                    per_node_matrix->arr,
-                    nodes_per_proc * n_nodes,
-                    MPI_INT,
-                    0,
-                    MPI_COMM_WORLD);
-        pprintf("Scattered adj\n");
-        if (scatter_res) {
-            pprintf("Error when scattering!\n");
+        flat_matrix_print(adj_matrix);
+        for (int i = 0; i < n_nodes * n_nodes; i++) {
+            printf("%d ", adj_matrix->arr[i]);
         }
+    }
+    int send_per_proc = nodes_per_proc * n_nodes;
+    pprintf("About to scatter adj, sending %d to each node\n", send_per_proc);
+    // we want to scatter. Since we store the matrix in row-major form, we can just
+    // take chunks of the adjacency matrix
+    int scatter_res = MPI_Scatter(adj_matrix->arr,
+            nodes_per_proc * n_nodes,
+            MPI_INT,
+            per_node_matrix->arr,
+            nodes_per_proc * n_nodes,
+            MPI_INT,
+            0,
+            MPI_COMM_WORLD);
+    pprintf("Scattered adj\n");
+    if (scatter_res) {
+        pprintf("Error when scattering!\n");
     }
 
     // function signatures should look like
@@ -118,33 +124,42 @@ int main(int argc, char **argv) {
 
     // now we gather the results
     MPI_Gather(dijkstra_distances, nodes_per_proc, MPI_INT, global_distances, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // for comparison, get results from serial dijsktra
     if (rank == 0) {
-
-        // and now we have the global distances!
-        pprintf("DISTANCES!\n");
-        for(int i = 0; i < n_nodes; i++) {
-            printf("%d ", global_distances[i]);
+        // save the results
+        int store_res = store_result_soft(SEED, n_nodes, n_edges, max_weight, ALGO_PAR_DIJKSTRA, global_distances, global_predecessors);
+        if (store_res == -1) {
+            printf("Could not store result!\n");
         }
-        printf("\n");
+
+        WEIGHT *ser_distances = calloc(n_nodes, sizeof(WEIGHT));
+        size_t *ser_predecessors = calloc(n_nodes, sizeof(size_t));
+        int res = read_result(SEED, n_nodes, n_edges, max_weight, ALGO_SER_DIJKSTRA, ser_distances, ser_predecessors);
+        if (res == -1) {
+            pprintf("Could not read past result!\n");
+        } else {
+            double l2 = l2_norm(global_distances, ser_distances, n_nodes);
+            printf("L2 norm with serial dijkstra: %lf\n", l2);
+
+            /*// and now we have the global distances!*/
+            /*pprintf("DIJKSTRA DISTANCES!\n");*/
+            /*for(int i = 0; i < n_nodes; i++) {*/
+                /*printf("%d ", global_distances[i]);*/
+            /*}*/
+            /*printf("\n");*/
+
+            /*// and now we have the global distances!*/
+            /*pprintf("SERIAL DISTANCES!\n");*/
+            /*for(int i = 0; i < n_nodes; i++) {*/
+                /*printf("%d ", global_distances[i]);*/
+            /*}*/
+            /*printf("\n");*/
+
+        }
+        free(ser_distances);
+        free(ser_predecessors);
     }
-
-    /*WEIGHT *serial_distances = calloc(n_nodes, sizeof(WEIGHT));*/
-
-    /*timing(&start_wall, &cpu);*/
-    /*serial_dijkstra(adj_matrix,*/
-                    /*n_nodes,*/
-                    /*n_edges,*/
-                    /*0,*/
-                    /*serial_distances,*/
-                    /*serial_predecessors);*/
-
-    /*timing(&end_wall, &cpu);*/
-    /*printf("BF's time: %.4f\n", end_wall - start_wall);*/
-
-    // use the serial version to verify results
-
-    /*double l2 = l2_norm(dijkstra_distances, serial_distances, n_nodes);*/
-    /*printf("\n\nL2 Norm: %lf\n", l2);*/
 
     ///////////////////////////////////////////////////////////////////////////
     ///  CLEAN UP
@@ -164,6 +179,9 @@ int main(int argc, char **argv) {
 }
 
 int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+
+    pprintf("PER_NODE MATRIX!!!!!\n");
+    flat_matrix_print(adj_matrix);
     // same thing as serial, except...
     // 1. Each processor gets assigned a "cluster" of nodes and maintains their own min heap
     //      WE WILL ASSUME THAT THE NUMBER OF PROCESSORS DIVIDES THE NUMBER OF NODES
@@ -218,20 +236,21 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
         }
 
 
-        pprintf("About to allgather\n");
+        pprintf("LOCAL MIN: %d %d\n", local_min->key, local_min->val);
         // now we do allgather. Once for the keys and once for the vals
-        MPI_Allgather(&local_min->key, 1, MPI_LONG, gather_keys, 1, MPI_LONG, MPI_COMM_WORLD);
+        MPI_Allgather(&local_min->key, 1, MPI_UNSIGNED_LONG, gather_keys, 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
         MPI_Allgather(&local_min->val, 1, MPI_INT, gather_vals, 1, MPI_INT, MPI_COMM_WORLD);
-        pprintf("Allgathered\n");
 
         // now we get the local min. To ensure consistency, we pick the min from the latest
         // process if there are ties.
         int min_proc = 0;
         WEIGHT min_val = gather_vals[0];
         for (int i = 1; i < n_procs; i++) {
-            if (gather_vals[i] != -1 && gather_vals[i] <= min_val) {
+            if ((gather_vals[i] != -1 && gather_vals[i] <= min_val)
+                    || min_val == -1) {
                 min_proc= i;
                 min_val = gather_vals[i];
+                pprintf("SETTING min_proc %d min_val %zd", min_proc, min_val);
             }
         }
         size_t min_node = gather_keys[min_proc];
@@ -241,18 +260,17 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
             break;
         }
 
-        // reinsert if we didn't choose our own to be the min
+        pprintf("CHOSEN MIN: key, val (%zd, %d) from proc %d\n", min_node, min_val, min_proc);
         if (min_proc == rank) {
-            pprintf("Chose min_node %d val %d\n", min_node, min_val);
             mqueue_pop_min(mq);
-            // otherwise we update the distances thing
             distances[min_node - offset] = min_val;
         }
 
         // now each proc updates their own mqueue based on the min val that was chosen
         for (int i = 0; i < nodes_per_proc; i++) {
-            pprintf("i, min_node %d, %d\n", i, min_node);
+            // pprintf("i, min_node %d, %d\n", i, min_node);
             if (!flat_matrix_get(adj_matrix, i, min_node)) {
+                //pprintf("Zero found at (%d, %zd)\n", i, min_node);
                 continue;
             }
             size_t alt_dist = min_val + flat_matrix_get(adj_matrix, i, min_node);
@@ -260,11 +278,10 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
             if (min_val != INT_MAX && alt_dist < distances[i]) {
                 distances[i] = (WEIGHT) alt_dist;
                 predecessors[i] = min_node; // this will be globally indexed
-                pprintf("Updating node %d distance to %d\n", i + offset, alt_dist);
+                /*pprintf("Updating node %d distance to %d\n", i + offset, alt_dist);*/
                 mqueue_update_val(mq, mqns[i], alt_dist);
             }
         }
-        pprintf("Bottom of loop\n");
 
     }
 

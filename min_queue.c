@@ -99,8 +99,6 @@ int mqueue_is_empty(MinQueue *mq) {
 
 void mqueue_update_val(MinQueue *mq, MQNode *mqn, WEIGHT new_val) {
     size_t i = mqn->idx;
-    printf("mqn is %zd %d %zd\n", mqn->key, mqn->val, mqn->idx);
-    printf("n_items is %zd\n", mq->n_items);
     WEIGHT old_val = mqn->val;
     mqn->val = new_val;
     // increasing priority means moving down in the heap

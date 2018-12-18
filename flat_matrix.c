@@ -17,7 +17,7 @@ int flat_matrix_set(FlatMatrix *fm, size_t r, size_t c, WEIGHT val) {
 }
 
 WEIGHT flat_matrix_get(FlatMatrix *fm, size_t r, size_t c) {
-    if (c >= fm->height || c >= fm->width) {
+    if (r >= fm->height || c >= fm->width) {
         return -1;
     }
     size_t idx = r * fm->width + c;
@@ -42,4 +42,13 @@ FlatMatrix *flat_matrix_from_2d_arr(WEIGHT **arr, size_t width, size_t height) {
 void flat_matrix_free(FlatMatrix *fm) {
     free(fm->arr);
     free(fm);
+}
+
+void flat_matrix_print(FlatMatrix *fm) {
+    for (int r = 0; r < fm->height; r++) {
+        for (int c = 0; c < fm->width; c++) {
+            printf("%3d ", flat_matrix_get(fm, r, c));
+        }
+        printf("\n");
+    }
 }
