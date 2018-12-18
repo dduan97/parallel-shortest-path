@@ -72,10 +72,10 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        flat_matrix_print(adj_matrix);
-        for (int i = 0; i < n_nodes * n_nodes; i++) {
-            printf("%d ", adj_matrix->arr[i]);
-        }
+        //flat_matrix_print(adj_matrix);
+        /*for (int i = 0; i < n_nodes * n_nodes; i++) {*/
+            /*printf("%d ", adj_matrix->arr[i]);*/
+        /*}*/
     }
     int send_per_proc = nodes_per_proc * n_nodes;
     pprintf("About to scatter adj, sending %d to each node\n", send_per_proc);
@@ -124,6 +124,7 @@ int main(int argc, char **argv) {
 
     // now we gather the results
     MPI_Gather(dijkstra_distances, nodes_per_proc, MPI_INT, global_distances, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
+    /*MPI_Gather(dijkstra_predecessors, nodes_per_proc, MPI_INT, global_predecessors, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);*/
 
     // for comparison, get results from serial dijsktra
     if (rank == 0) {
@@ -182,8 +183,8 @@ int main(int argc, char **argv) {
 
 int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors) {
 
-    pprintf("PER_NODE MATRIX!!!!!\n");
-    flat_matrix_print(adj_matrix);
+    //pprintf("PER_NODE MATRIX!!!!!\n");
+    //flat_matrix_print(adj_matrix);
     // same thing as serial, except...
     // 1. Each processor gets assigned a "cluster" of nodes and maintains their own min heap
     //      WE WILL ASSUME THAT THE NUMBER OF PROCESSORS DIVIDES THE NUMBER OF NODES
