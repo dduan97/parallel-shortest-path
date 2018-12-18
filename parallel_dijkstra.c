@@ -78,18 +78,18 @@ int main(int argc, char **argv) {
         /*}*/
     }
     int send_per_proc = nodes_per_proc * n_nodes;
-    pprintf("About to scatter adj, sending %d to each node\n", send_per_proc);
+    int *send_buf = (rank == 0) ? adj_matrix->arr : &send_per_proc;
     // we want to scatter. Since we store the matrix in row-major form, we can just
     // take chunks of the adjacency matrix
-    int scatter_res = MPI_Scatter(adj_matrix->arr,
-            nodes_per_proc * n_nodes,
+    int scatter_res = MPI_Scatter(
+            send_buf,
+            send_per_proc,
             MPI_INT,
             per_node_matrix->arr,
-            nodes_per_proc * n_nodes,
+            send_per_proc,
             MPI_INT,
             0,
             MPI_COMM_WORLD);
-    pprintf("Scattered adj\n");
     if (scatter_res) {
         pprintf("Error when scattering!\n");
     }
@@ -239,7 +239,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src,
         }
 
 
-        pprintf("LOCAL MIN: %d %d\n", local_min->key, local_min->val);
+        //pprintf("LOCAL MIN: %d %d\n", local_min->key, local_min->val);
         // now we do allgather. Once for the keys and once for the vals
         MPI_Allgather(&local_min->key, 1, MPI_INT, gather_keys, 1, MPI_INT, MPI_COMM_WORLD);
         MPI_Allgather(&local_min->val, 1, MPI_INT, gather_vals, 1, MPI_INT, MPI_COMM_WORLD);
@@ -253,7 +253,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src,
                     || min_val == -1) {
                 min_proc= i;
                 min_val = gather_vals[i];
-                pprintf("SETTING min_proc %d min_val %zd", min_proc, min_val);
+                //pprintf("SETTING min_proc %d min_val %zd", min_proc, min_val);
             }
         }
         int min_node = gather_keys[min_proc];
@@ -263,7 +263,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src,
             break;
         }
 
-        pprintf("CHOSEN MIN: key, val (%zd, %d) from proc %d\n", min_node, min_val, min_proc);
+        //pprintf("CHOSEN MIN: key, val (%zd, %d) from proc %d\n", min_node, min_val, min_proc);
         if (min_proc == rank) {
             mqueue_pop_min(mq);
             distances[min_node - offset] = min_val;

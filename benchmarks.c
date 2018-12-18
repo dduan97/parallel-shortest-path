@@ -44,6 +44,9 @@ int serial_dijkstra(FlatMatrix *adj_matrix, int n_nodes, unsigned long n_edges, 
     // CLEAN UP
     ///////////////////////////////////////////////////////////////////
     mqueue_free(mq, 0);
+    for (int i = 0; i < n_nodes; i++) {
+        free(mqns[i]);
+    }
     free(mqns);
     return 0;
 }
