@@ -3,7 +3,7 @@ LD = mpicc
 CFLAGS = -g -O -xHost -fno-alias -std=c99 -I$(TIMINGDIR) -c -lmpi
 
 BINARIES = serial serial.debug tests parallel_dijkstra parallel_dijkstra.debug
-COMMON_O = helpers.o min_queue.o benchmarks.o flat_matrix.o
+COMMON_O = helpers.o min_queue.o benchmarks.o flat_matrix.o resultr.o
 
 all: $(BINARIES)
 

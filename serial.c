@@ -1,5 +1,6 @@
 // main file for serial versions
 #include "benchmarks.h"
+#include "resultr.h"
 
 // function declarations
 void print_path(size_t *predecessors, size_t idx);
@@ -81,6 +82,10 @@ int main(int argc, char **argv) {
 
     double l2 = l2_norm(dijkstra_distances, bf_distances, n_nodes);
     printf("\n\nL2 Norm: %lf\n", l2);
+
+    // now write using resultr
+    store_result_soft(SEED, n_nodes, n_edges, max_weight, ALGO_SER_DIJKSTRA, dijkstra_distances, dijkstra_predecessors);
+    store_result_soft(SEED, n_nodes, n_edges, max_weight, ALGO_SER_BF, bf_distances, bf_predecessors);
 
     ///////////////////////////////////////////////////////////////////////////
     ///  CLEAN UP
