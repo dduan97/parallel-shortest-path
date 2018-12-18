@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
 
     pprintf("About to call parallel dijkstra\n");
     timing(&start_wall, &cpu);
-    parallel_dijkstra(adj_matrix,
+    parallel_dijkstra(per_node_matrix,
                     n_nodes,
                     n_edges,
                     0,
@@ -118,12 +118,15 @@ int main(int argc, char **argv) {
 
     // now we gather the results
     MPI_Gather(dijkstra_distances, nodes_per_proc, MPI_INT, global_distances, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
-    // and now we have the global distances!
-    pprintf("DISTANCES!\n");
-    for(int i = 0; i < n_nodes; i++) {
-        pprintf("%d ", global_distances[i]);
+    if (rank == 0) {
+
+        // and now we have the global distances!
+        pprintf("DISTANCES!\n");
+        for(int i = 0; i < n_nodes; i++) {
+            printf("%d ", global_distances[i]);
+        }
+        printf("\n");
     }
-    pprintf("\n");
 
     /*WEIGHT *serial_distances = calloc(n_nodes, sizeof(WEIGHT));*/
 
@@ -150,7 +153,9 @@ int main(int argc, char **argv) {
     /*free(serial_predecessors);*/
     free(dijkstra_distances);
     /*free(serial_distances);*/
-    flat_matrix_free(adj_matrix);
+    if (rank == 0) {
+        flat_matrix_free(adj_matrix);
+    }
     flat_matrix_free(per_node_matrix);
 
     MPI_Finalize();
@@ -206,7 +211,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
 
     while (1) {
         // now we get the global min. Each one checks its local min
-        MQNode *local_min = mqueue_pop_min(mq);
+        MQNode *local_min = mqueue_peek_min(mq);
         // if the node is empty, we will send -1, -1
         if (local_min == NULL) {
             local_min = &DUMMY;
@@ -237,9 +242,9 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
         }
 
         // reinsert if we didn't choose our own to be the min
-        if (min_proc != rank) {
-            mqueue_insert(mq, local_min);
-        } else {
+        if (min_proc == rank) {
+            pprintf("Chose min_node %d val %d\n", min_node, min_val);
+            mqueue_pop_min(mq);
             // otherwise we update the distances thing
             distances[min_node - offset] = min_val;
         }
@@ -261,6 +266,10 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
         }
         pprintf("Bottom of loop\n");
 
+    }
+
+    for (int i = 0; i < nodes_per_proc; i++) {
+        pprintf("NOde %zd distance: %d\n", i + offset, distances[i]);
     }
 
     //////////////////////////////////////////////////////////////

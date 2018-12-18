@@ -66,9 +66,18 @@ size_t mqueue_insert(MinQueue *mq, MQNode *mqn) {
     // otherwise, we insert into the end and bubble up
     // since the root node should be at index 1, increment n_items before assigning
     mq->arr[++mq->n_items] = mqn;
+    mq->arr[mq->n_items]->idx = mq->n_items;
     up_dog(mq, mq->n_items);
 
     return 0;
+}
+
+MQNode *mqueue_peek_min(MinQueue *mq) {
+    if (mqueue_is_empty(mq)) {
+        return NULL;
+    }
+    MQNode *min = mq->arr[1];
+    return min;
 }
 
 MQNode *mqueue_pop_min(MinQueue *mq) {
@@ -90,11 +99,13 @@ int mqueue_is_empty(MinQueue *mq) {
 
 void mqueue_update_val(MinQueue *mq, MQNode *mqn, WEIGHT new_val) {
     size_t i = mqn->idx;
+    printf("mqn is %zd %d %zd\n", mqn->key, mqn->val, mqn->idx);
+    printf("n_items is %zd\n", mq->n_items);
     WEIGHT old_val = mqn->val;
     mqn->val = new_val;
     // increasing priority means moving down in the heap
     if (new_val > old_val) {
-        i = downward_dog(mq, i);
+        downward_dog(mq, i);
     } else if (new_val < old_val) {
         up_dog(mq, i);
     }

@@ -8,7 +8,7 @@ typedef struct {
     size_t key;
     WEIGHT val;
     size_t idx;
-} __attribute__((__packed__)) MQNode;
+} MQNode;
 
 // this will be a key-value store.
 typedef struct {
@@ -23,6 +23,7 @@ MinQueue *mqueue_init(size_t capacity);
 size_t mqueue_insert(MinQueue *mq, MQNode *mqn);
 
 MQNode *mqueue_pop_min(MinQueue *mq);
+MQNode *mqueue_peek_min(MinQueue *mq);
 
 int mqueue_is_empty(MinQueue *mq);
 
