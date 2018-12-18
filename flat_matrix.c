@@ -1,6 +1,6 @@
 #include "flat_matrix.h"
 
-FlatMatrix *flat_matrix_init(size_t width, size_t height) {
+FlatMatrix *flat_matrix_init(int width, int height) {
     FlatMatrix *fm = malloc(sizeof(FlatMatrix));
     fm->width = width;
     fm->height = height;
@@ -8,24 +8,25 @@ FlatMatrix *flat_matrix_init(size_t width, size_t height) {
     return fm;
 }
 
-int flat_matrix_set(FlatMatrix *fm, size_t r, size_t c, WEIGHT val) {
+int flat_matrix_set(FlatMatrix *fm, int r, int c, WEIGHT val) {
     if (c >= fm->height || c >= fm->width) {
         return -1;
     }
-    size_t idx = r * fm->width + c;
+    // the index might be bigger than an int
+    unsigned long idx = r * fm->width + c;
     fm->arr[idx] = val;
 }
 
-WEIGHT flat_matrix_get(FlatMatrix *fm, size_t r, size_t c) {
+WEIGHT flat_matrix_get(FlatMatrix *fm, int r, int c) {
     if (r >= fm->height || c >= fm->width) {
         return -1;
     }
-    size_t idx = r * fm->width + c;
+    unsigned long idx = r * fm->width + c;
     return fm->arr[idx];
 }
 
 
-FlatMatrix *flat_matrix_from_2d_arr(WEIGHT **arr, size_t width, size_t height) {
+FlatMatrix *flat_matrix_from_2d_arr(WEIGHT **arr, int width, int height) {
     FlatMatrix *fm = malloc(sizeof(FlatMatrix));
     fm->width = width;
     fm->height = height;

@@ -3,7 +3,7 @@
 #include "resultr.h"
 
 // function declarations
-void print_path(size_t *predecessors, size_t idx);
+void print_path(int *predecessors, int idx);
 
 int main(int argc, char **argv) {
 
@@ -17,8 +17,8 @@ int main(int argc, char **argv) {
 
     debug_init();
 
-    size_t n_nodes = atoi(argv[1]);
-    size_t n_edges = atoi(argv[2]);
+    int n_nodes = atoi(argv[1]);
+    unsigned long n_edges = atoi(argv[2]);
     int max_weight = atoi(argv[3]);
 
     FlatMatrix *adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
@@ -37,8 +37,8 @@ int main(int argc, char **argv) {
 
     //print_array(adj_matrix, n_nodes);
 
-    size_t *dijkstra_predecessors = calloc(n_nodes, sizeof(size_t));
-    size_t *bf_predecessors = calloc(n_nodes, sizeof(size_t));
+    int *dijkstra_predecessors = calloc(n_nodes, sizeof(int));
+    int *bf_predecessors = calloc(n_nodes, sizeof(int));
 
     WEIGHT *dijkstra_distances = calloc(n_nodes, sizeof(WEIGHT));
 
@@ -69,9 +69,9 @@ int main(int argc, char **argv) {
 
     // make sure they're the same!
     // TODO: replace this with a norm
-    for (size_t i = 0; i < n_nodes; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         if (bf_distances[i] != dijkstra_distances[i]) {
-            printf("Disagreement at index %zd! Dijkstras %d BF %d\n", i, dijkstra_distances[i], bf_distances[i]);
+            printf("Disagreement at index %d! Dijkstras %d BF %d\n", i, dijkstra_distances[i], bf_distances[i]);
             printf("\tDijkstra's path:\n\t\t");
             print_path(dijkstra_predecessors, i);
             printf("\n\tBF's path:\n\t\t");

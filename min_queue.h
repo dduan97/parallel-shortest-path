@@ -5,22 +5,22 @@
 #include "helpers.h"
 
 typedef struct {
-    size_t key;
+    int key;
     WEIGHT val;
-    size_t idx;
+    int idx;
 } MQNode;
 
 // this will be a key-value store.
 typedef struct {
-    size_t capacity;
-    size_t n_items;
+    int capacity;
+    int n_items;
     MQNode **arr;
 } MinQueue;
 
-MinQueue *mqueue_init(size_t capacity);
+MinQueue *mqueue_init(int capacity);
 
 // returns 0 on success, -1 on fail
-size_t mqueue_insert(MinQueue *mq, MQNode *mqn);
+int mqueue_insert(MinQueue *mq, MQNode *mqn);
 
 MQNode *mqueue_pop_min(MinQueue *mq);
 MQNode *mqueue_peek_min(MinQueue *mq);

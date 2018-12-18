@@ -1,7 +1,7 @@
 #include "min_queue.h"
 
 //helper function to swap two nodes in an array
-static void swap(MinQueue *mq, size_t idx1, size_t idx2) {
+static void swap(MinQueue *mq, int idx1, int idx2) {
     MQNode *n1 = mq->arr[idx1];
     mq->arr[idx1] = mq->arr[idx2];
     mq->arr[idx2] = n1;
@@ -10,7 +10,7 @@ static void swap(MinQueue *mq, size_t idx1, size_t idx2) {
 }
 
 // helper function to propogate a node up
-static size_t up_dog(MinQueue *mq, size_t i) {
+static int up_dog(MinQueue *mq, int i) {
     while (i > 1) {
         if (mq->arr[i]->val > mq->arr[i / 2]->val) {
             break;
@@ -23,7 +23,7 @@ static size_t up_dog(MinQueue *mq, size_t i) {
 }
 
 // helper function to propogate a node up
-static size_t downward_dog(MinQueue *mq, size_t i) {
+static int downward_dog(MinQueue *mq, int i) {
     while (2*i <= mq->n_items) {
         // if there is no right child
         if (2*i == mq->n_items) {
@@ -38,7 +38,7 @@ static size_t downward_dog(MinQueue *mq, size_t i) {
         }
 
         // otherwise we choose the smaller child
-        size_t child_idx = 2*i;
+        int child_idx = 2*i;
         if (mq->arr[2*i]->val > mq->arr[2*i + 1]->val) {
             child_idx = 2*i + 1;
         }
@@ -50,7 +50,7 @@ static size_t downward_dog(MinQueue *mq, size_t i) {
     return i;
 }
 
-MinQueue *mqueue_init(size_t capacity) {
+MinQueue *mqueue_init(int capacity) {
     MinQueue *mq = malloc(sizeof(MinQueue));
     mq->capacity = capacity;
     mq->arr = malloc(capacity * sizeof(MQNode));
@@ -58,7 +58,7 @@ MinQueue *mqueue_init(size_t capacity) {
     return mq;
 }
 
-size_t mqueue_insert(MinQueue *mq, MQNode *mqn) {
+int mqueue_insert(MinQueue *mq, MQNode *mqn) {
     if (mq->n_items == mq->capacity) {
        return -1;
     }
@@ -98,7 +98,7 @@ int mqueue_is_empty(MinQueue *mq) {
 }
 
 void mqueue_update_val(MinQueue *mq, MQNode *mqn, WEIGHT new_val) {
-    size_t i = mqn->idx;
+    int i = mqn->idx;
     WEIGHT old_val = mqn->val;
     mqn->val = new_val;
     // increasing priority means moving down in the heap
@@ -111,7 +111,7 @@ void mqueue_update_val(MinQueue *mq, MQNode *mqn, WEIGHT new_val) {
 
 void mqueue_free(MinQueue *mq, int dynamic_nodes) {
     if (dynamic_nodes) {
-        for (size_t i = 0; i < mq->n_items; i++) {
+        for (int i = 0; i < mq->n_items; i++) {
             free(mq->arr[i]);
         }
     }
@@ -120,9 +120,9 @@ void mqueue_free(MinQueue *mq, int dynamic_nodes) {
 }
 
 void mqueue_print(MinQueue *mq) {
-    for (size_t i = 1; i <= mq->n_items; i++) {
+    for (int i = 1; i <= mq->n_items; i++) {
         MQNode *mqn = mq->arr[i];
-        printf("(%zd %d), ", mqn->key, mqn->val);
+        printf("(%d %d), ", mqn->key, mqn->val);
     }
     printf("\n");
 }

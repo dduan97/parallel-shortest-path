@@ -5,23 +5,23 @@ int KEY_LEN = 64;
 const char *dist_fmt = "%d ";
 const char *pred_fmt = "%zd ";
 
-static int get_filename(char *buf, int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORITHM algo) {
-    return sprintf(buf, "./results/%d_%zd_%zd_%d_%d.results", seed, n_nodes, n_edges, max_weight, algo);
+static int get_filename(char *buf, int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo) {
+    return sprintf(buf, "./results/%d_%d_%d_%d_%d.results", seed, n_nodes, n_edges, max_weight, algo);
 }
 
-static int results_to_file(char *filename, size_t n_nodes, WEIGHT *distances, size_t *predecessors) {
+static int results_to_file(char *filename, int n_nodes, WEIGHT *distances, int *predecessors) {
     FILE *fp = fopen(filename, "w+");
     if (fp == NULL) {
         printf("Could not open file %s\n", filename);
         return -1;
     }
     // write the weights in one line
-    for (size_t i = 0; i < n_nodes; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         fprintf(fp, dist_fmt, distances[i]);
     }
     fprintf(fp, "\n");
     // now the predecessors
-    for (size_t i = 0; i < n_nodes; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         fprintf(fp, pred_fmt, predecessors[i]);
     }
     fclose(fp);
@@ -29,7 +29,7 @@ static int results_to_file(char *filename, size_t n_nodes, WEIGHT *distances, si
 }
 
 // does not override the existing result file
-int store_result_soft(int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, size_t *predecessors) {
+int store_result_soft(int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, int *predecessors) {
     char buf[KEY_LEN];
     if (get_filename(buf, seed, n_nodes, n_edges, max_weight, algo) == -1) {
         printf("Error generating filename!\n");
@@ -49,7 +49,7 @@ int store_result_soft(int seed, size_t n_nodes, size_t n_edges, int max_weight, 
 }
 
 
-int store_result_hard(int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, size_t *predecessors) {
+int store_result_hard(int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, int *predecessors) {
     char buf[KEY_LEN];
     if (get_filename(buf, seed, n_nodes, n_edges, max_weight, algo) == -1) {
         printf("ERROR generating filename\n");
@@ -59,7 +59,7 @@ int store_result_hard(int seed, size_t n_nodes, size_t n_edges, int max_weight, 
 }
 
 // here, distances and predecessors will be output buffers
-int read_result(int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, size_t *predecessors) {
+int read_result(int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, int *predecessors) {
     char buf[KEY_LEN];
     if (get_filename(buf, seed, n_nodes, n_edges, max_weight, algo) == -1) {
         printf("ERROR generating filename\n");
@@ -72,13 +72,13 @@ int read_result(int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORI
     }
     // now we read
     // first the distances
-    for (size_t i = 0; i < n_nodes; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         fscanf(fp, dist_fmt, distances + i);
     }
     // now the newline
     fscanf(fp, "\n");
     // now the predecessors
-    for (size_t i = 0; i < n_nodes; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         fscanf(fp, pred_fmt, predecessors + i);
     }
     return 1;

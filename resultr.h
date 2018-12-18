@@ -13,6 +13,6 @@ typedef enum {
 } ALGORITHM;
 
 
-int read_result(int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, size_t *predecessors);
-int store_result_soft(int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, size_t *predecessors);
-int store_result_hard(int seed, size_t n_nodes, size_t n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, size_t *predecessors);
+int read_result(int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, int *predecessors);
+int store_result_soft(int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, int *predecessors);
+int store_result_hard(int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo, WEIGHT *distances, int *predecessors);

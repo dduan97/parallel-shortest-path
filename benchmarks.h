@@ -8,7 +8,7 @@
 #include "min_queue.h"
 #include "flat_matrix.h"
 
-int serial_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors);
-int serial_bellman_ford(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors);
+int serial_dijkstra(FlatMatrix *adj_matrix, int n_nodes, unsigned long n_edges, int src, WEIGHT *distances, int *predecessors);
+int serial_bellman_ford(FlatMatrix *adj_matrix, int n_nodes, unsigned long n_edges, int src, WEIGHT *distances, int *predecessors);
 
 #endif

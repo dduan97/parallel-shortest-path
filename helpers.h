@@ -15,18 +15,18 @@
 
 static int DEBUG_MODE = 0;
 
-FlatMatrix *gen_graph(size_t n_nodes, size_t n_edges, int max_weight);
+FlatMatrix *gen_graph(int n_nodes, unsigned long n_edges, int max_weight);
 
 // function for pretty printing a square 2-d array
-void print_array(WEIGHT **arr, size_t dim);
+void print_array(WEIGHT **arr, int dim);
 
-void free_array(WEIGHT **arr, size_t dim);
+void free_array(WEIGHT **arr, int dim);
 
 // timing routines
 void timing(double* wcTime, double* cpuTime);
 void timing_(double* wcTime, double* cpuTime);
 
-double l2_norm(WEIGHT *arr1, WEIGHT *arr2, size_t len);
+double l2_norm(WEIGHT *arr1, WEIGHT *arr2, int len);
 void debug_init();
 void debugf(const char *fmt, ...);
 

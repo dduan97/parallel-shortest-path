@@ -7,15 +7,15 @@
 
 typedef struct {
     WEIGHT *arr;
-    size_t width;
-    size_t height;
+    int width;
+    int height;
 } FlatMatrix;
 
 
-FlatMatrix *flat_matrix_init(size_t width, size_t height);
-int flat_matrix_set(FlatMatrix *fm, size_t r, size_t c, WEIGHT val);
-WEIGHT flat_matrix_get(FlatMatrix *fm, size_t r, size_t c);
-FlatMatrix *flat_matrix_from_2d_arr(WEIGHT **arr, size_t width, size_t height);
+FlatMatrix *flat_matrix_init(int width, int height);
+int flat_matrix_set(FlatMatrix *fm, int r, int c, WEIGHT val);
+WEIGHT flat_matrix_get(FlatMatrix *fm, int r, int c);
+FlatMatrix *flat_matrix_from_2d_arr(WEIGHT **arr, int width, int height);
 
 void flat_matrix_free(FlatMatrix *fm);
 

@@ -1,7 +1,7 @@
 #include "benchmarks.h"
 
 // returns 0 on success, -1 on failure for whatever reason.
-int serial_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+int serial_dijkstra(FlatMatrix *adj_matrix, int n_nodes, unsigned long n_edges, int src, WEIGHT *distances, int *predecessors) {
     // first we need a distance vector type thing
     MQNode **mqns = malloc(n_nodes * sizeof(MQNode)); // oh boy
     distances[src] = 0;
@@ -9,7 +9,7 @@ int serial_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size
     MinQueue *mq = mqueue_init(n_nodes);
 
     // initialize all of the distances into the min queue
-    for (size_t v = 0; v < n_nodes; v++) {
+    for (int v = 0; v < n_nodes; v++) {
         if (v != src) {
             distances[v] = INT_MAX;  // doesn't feel too kosher but we're going with it
         }
@@ -23,13 +23,13 @@ int serial_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size
 
     while (!mqueue_is_empty(mq)) {
         MQNode *mqn = mqueue_pop_min(mq);
-        size_t v = mqn->key;
+        int v = mqn->key;
         debugf("Popped node %d with distance %d\n", v, distances[v]);
-        for (size_t n = 0; n < n_nodes; n++) { // iterate through each neighbor of that node
+        for (int n = 0; n < n_nodes; n++) { // iterate through each neighbor of that node
             if (!flat_matrix_get(adj_matrix, n, v)) {
                 continue;
             }
-            size_t alt_dist = distances[v] + flat_matrix_get(adj_matrix, n, v);
+            WEIGHT alt_dist = distances[v] + flat_matrix_get(adj_matrix, n, v);
             debugf("For node %d, alt_dist %ld, distances %d, adj_matrix %d\n", n, alt_dist, distances[n], flat_matrix_get(adj_matrix, n, v));
             if (distances[v] != INT_MAX && alt_dist < distances[n]) {
                 distances[n] = (WEIGHT) alt_dist;
@@ -49,19 +49,19 @@ int serial_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size
 }
 
 // returns 0 on success, -1 on failure for whatever reason.
-int serial_bellman_ford(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+int serial_bellman_ford(FlatMatrix *adj_matrix, int n_nodes, unsigned long n_edges, int src, WEIGHT *distances, int *predecessors) {
     // preprocess once to convert adjacency matrix to edge list
     typedef struct {
-        size_t n1;
-        size_t n2;
+        int n1;
+        int n2;
         WEIGHT weight;
     } Edge;
 
     Edge *edges= calloc(n_edges, sizeof(Edge));
 
-    size_t e_i = 0;
-    for (size_t i = 0; i < n_nodes; i++) {
-        for (size_t j = i; j < n_nodes; j++) {
+    int e_i = 0;
+    for (int i = 0; i < n_nodes; i++) {
+        for (int j = i; j < n_nodes; j++) {
             if (flat_matrix_get(adj_matrix, i, j)) {
                 Edge e = {i, j, flat_matrix_get(adj_matrix, i, j)};
                 edges[e_i++] = e;
@@ -72,17 +72,17 @@ int serial_bellman_ford(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, 
 
 
     // now that we have the edge list...
-    for (size_t i = 0; i < n_nodes; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         distances[i] = INT_MAX;
         predecessors[i] = -1;
     }
 
     distances[src] = 0;
 
-    for (size_t v = 1; v < n_nodes; v++){
-        for (size_t e = 0; e < n_edges; e++) {
-            size_t u = edges[e].n1;
-            size_t v = edges[e].n2;
+    for (int v = 1; v < n_nodes; v++){
+        for (unsigned long e = 0; e < n_edges; e++) {
+            int u = edges[e].n1;
+            int v = edges[e].n2;
             WEIGHT w = edges[e].weight;
             // check if v can go through u instead
             if (distances[u] != INT_MAX && distances[u] + w < distances[v]) {
@@ -107,9 +107,9 @@ int serial_bellman_ford(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, 
 }
 
 
-void print_path(size_t *predecessors, size_t idx) {
+void print_path(int *predecessors, int idx) {
     while (idx != -1) {
-        printf("%zd ", idx);
+        printf("%d ", idx);
         idx = predecessors[idx];
     }
 }

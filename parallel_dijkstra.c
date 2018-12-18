@@ -22,7 +22,7 @@ static void pprintf(const char *fmt, ...) {
 
 MQNode DUMMY = {-1, -1, -1};
 
-int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors);
+int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors);
 
 int main(int argc, char **argv) {
 
@@ -38,8 +38,8 @@ int main(int argc, char **argv) {
 
     debug_init();
 
-    size_t n_nodes = atoi(argv[1]);
-    size_t n_edges = atoi(argv[2]);
+    int n_nodes = atoi(argv[1]);
+    unsigned long n_edges = atoi(argv[2]);
     int max_weight = atoi(argv[3]);
 
     FlatMatrix *adj_matrix;
@@ -57,14 +57,14 @@ int main(int argc, char **argv) {
     FlatMatrix *per_node_matrix = flat_matrix_init(n_nodes, nodes_per_proc);
     // global distances and global predecessors for gathering
     WEIGHT *global_distances = NULL;
-    size_t *global_predecessors = NULL;
+    int *global_predecessors = NULL;
 
     pprintf("About to have master generate stuff\n");
     // the master proc will generate the graph
     if (rank == 0) {
         // allocate global distances and predecessors
         global_distances = calloc(n_nodes, sizeof(WEIGHT));
-        global_predecessors = calloc(n_nodes, sizeof(size_t));
+        global_predecessors = calloc(n_nodes, sizeof(int));
 
 
         adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
     //print_array(adj_matrix, n_nodes);
 
     // each node has its own predecessors and distances arrays
-    size_t *dijkstra_predecessors = calloc(nodes_per_proc, sizeof(size_t));
+    int *dijkstra_predecessors = calloc(nodes_per_proc, sizeof(int));
 
     WEIGHT *dijkstra_distances = calloc(nodes_per_proc, sizeof(WEIGHT));
 
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
         }
 
         WEIGHT *ser_distances = calloc(n_nodes, sizeof(WEIGHT));
-        size_t *ser_predecessors = calloc(n_nodes, sizeof(size_t));
+        int *ser_predecessors = calloc(n_nodes, sizeof(int));
         int res = read_result(SEED, n_nodes, n_edges, max_weight, ALGO_SER_DIJKSTRA, ser_distances, ser_predecessors);
         if (res == -1) {
             pprintf("Could not read past result!\n");
@@ -170,6 +170,8 @@ int main(int argc, char **argv) {
     /*free(serial_distances);*/
     if (rank == 0) {
         flat_matrix_free(adj_matrix);
+        free(global_distances);
+        free(global_predecessors);
     }
     flat_matrix_free(per_node_matrix);
 
@@ -178,7 +180,7 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors) {
 
     pprintf("PER_NODE MATRIX!!!!!\n");
     flat_matrix_print(adj_matrix);
@@ -199,20 +201,20 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
 
     // now we get our cluster.
     // ASSUME that num_procs | n_nodes
-    size_t nodes_per_proc = n_nodes / n_procs;
-    size_t offset = nodes_per_proc * rank;
+    int nodes_per_proc = n_nodes / n_procs;
+    int offset = nodes_per_proc * rank;
 
 
     // buffers for the keys/vals for the min select
     WEIGHT *gather_vals = calloc(n_procs, sizeof(WEIGHT));
-    WEIGHT *gather_keys = calloc(n_procs, sizeof(size_t));
+    WEIGHT *gather_keys = calloc(n_procs, sizeof(int));
 
     MQNode **mqns = malloc(nodes_per_proc * sizeof(MQNode)); // oh boy
     MinQueue *mq = mqueue_init(nodes_per_proc);
 
     // Everything stored in the min queue is in global terms
     // initialize all of the distances into the min queue
-    for (size_t v = 0; v < nodes_per_proc; v++) {
+    for (int v = 0; v < nodes_per_proc; v++) {
         // each node keeps track of its own min queue
         if (v + offset == src) {
             distances[src - offset] = 0;
@@ -238,7 +240,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
 
         pprintf("LOCAL MIN: %d %d\n", local_min->key, local_min->val);
         // now we do allgather. Once for the keys and once for the vals
-        MPI_Allgather(&local_min->key, 1, MPI_UNSIGNED_LONG, gather_keys, 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
+        MPI_Allgather(&local_min->key, 1, MPI_INT, gather_keys, 1, MPI_INT, MPI_COMM_WORLD);
         MPI_Allgather(&local_min->val, 1, MPI_INT, gather_vals, 1, MPI_INT, MPI_COMM_WORLD);
 
         // now we get the local min. To ensure consistency, we pick the min from the latest
@@ -253,7 +255,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
                 pprintf("SETTING min_proc %d min_val %zd", min_proc, min_val);
             }
         }
-        size_t min_node = gather_keys[min_proc];
+        int min_node = gather_keys[min_proc];
 
         // check if we have nothing left
         if (min_val == -1) {
@@ -273,7 +275,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
                 //pprintf("Zero found at (%d, %zd)\n", i, min_node);
                 continue;
             }
-            size_t alt_dist = min_val + flat_matrix_get(adj_matrix, i, min_node);
+            int alt_dist = min_val + flat_matrix_get(adj_matrix, i, min_node);
             // debugf("For node %d, alt_dist %ld, distances %d, adj_matrix %d\n", n, alt_dist, distances[n], flat_matrix_get(adj_matrix, n, v));
             if (min_val != INT_MAX && alt_dist < distances[i]) {
                 distances[i] = (WEIGHT) alt_dist;
@@ -285,9 +287,9 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, si
 
     }
 
-    for (int i = 0; i < nodes_per_proc; i++) {
-        pprintf("NOde %zd distance: %d\n", i + offset, distances[i]);
-    }
+    /*for (int i = 0; i < nodes_per_proc; i++) {*/
+        /*pprintf("NOde %zd distance: %d\n", i + offset, distances[i]);*/
+    /*}*/
 
     //////////////////////////////////////////////////////////////
     // CLEANUP
