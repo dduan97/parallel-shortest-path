@@ -4,16 +4,22 @@ FlatMatrix *flat_matrix_init(size_t width, size_t height) {
     FlatMatrix *fm = malloc(sizeof(FlatMatrix));
     fm->width = width;
     fm->height = height;
-    fm->arr = malloc(width * height * sizeof(WEIGHT));
+    fm->arr = calloc(width * height, sizeof(WEIGHT));
     return fm;
 }
 
-void flat_matrix_set(FlatMatrix *fm, size_t r, size_t c, WEIGHT val) {
+int flat_matrix_set(FlatMatrix *fm, size_t r, size_t c, WEIGHT val) {
+    if (c >= fm->height || c >= fm->width) {
+        return -1;
+    }
     size_t idx = r * fm->width + c;
     fm->arr[idx] = val;
 }
 
 WEIGHT flat_matrix_get(FlatMatrix *fm, size_t r, size_t c) {
+    if (c >= fm->height || c >= fm->width) {
+        return -1;
+    }
     size_t idx = r * fm->width + c;
     return fm->arr[idx];
 }
