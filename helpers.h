@@ -2,7 +2,6 @@
 #define __HELPERS_H__
 
 #define SEED 21897
-#define WEIGHT int
 
 #include <stdlib.h>
 #include <stdarg.h>
@@ -12,9 +11,11 @@
 #include <sys/types.h>
 #include <sys/resource.h>
 
+#include "flat_matrix.h"
+
 static int DEBUG_MODE = 0;
 
-WEIGHT **gen_graph(size_t n_nodes, size_t n_edges, int max_weight);
+FlatMatrix *gen_graph(size_t n_nodes, size_t n_edges, int max_weight);
 
 // function for pretty printing a square 2-d array
 void print_array(WEIGHT **arr, size_t dim);

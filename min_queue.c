@@ -72,6 +72,9 @@ size_t mqueue_insert(MinQueue *mq, MQNode *mqn) {
 }
 
 MQNode *mqueue_pop_min(MinQueue *mq) {
+    if (mqueue_is_empty(mq)) {
+        return NULL;
+    }
     MQNode *min = mq->arr[1];
     mq->arr[1] = mq->arr[mq->n_items];
     mq->arr[1]->idx = 1;

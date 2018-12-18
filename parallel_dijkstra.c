@@ -5,7 +5,23 @@
 #include "helpers.h"
 #include "benchmarks.h"
 
-int parallel_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors);
+enum MPI_TAG {
+    TAG_KEY,
+    TAG_VAL
+};
+
+static void pprintf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    printf("[RANK %d]: ", rank);
+    vprintf(fmt, args);
+}
+
+MQNode DUMMY = {-1, -1, -1};
+
+int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors);
 
 int main(int argc, char **argv) {
 
@@ -25,17 +41,10 @@ int main(int argc, char **argv) {
     size_t n_edges = atoi(argv[2]);
     int max_weight = atoi(argv[3]);
 
-    WEIGHT **adj_matrix = NULL;
+    FlatMatrix *adj_matrix;
     int rank, n_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &n_procs);
-    // the master proc will generate the graph
-    if (rank == 0) {
-        adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
-        if (adj_matrix == NULL) {
-            exit(1);
-        }
-    }
 
     // master proc should split the graph up and distribute to each node
     // also each proc should have their own version of distances[] and predecessors[]
@@ -43,9 +52,41 @@ int main(int argc, char **argv) {
     // now we get our cluster.
     // ASSUME that num_procs | n_nodes
     int nodes_per_proc = n_nodes / n_procs;
-    int cluster_start = rank * nodes_per_proc;
+    // each node will have a matrix with nodes_per_proc rows and n_nodes cols
+    FlatMatrix *per_node_matrix = flat_matrix_init(n_nodes, nodes_per_proc);
+    // global distances and global predecessors for gathering
+    WEIGHT *global_distances = NULL;
+    size_t *global_predecessors = NULL;
 
-    // now to distribute the
+    pprintf("About to have master generate stuff\n");
+    // the master proc will generate the graph
+    if (rank == 0) {
+        // allocate global distances and predecessors
+        global_distances = calloc(n_nodes, sizeof(WEIGHT));
+        global_predecessors = calloc(n_nodes, sizeof(size_t));
+
+
+        adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
+        if (adj_matrix == NULL) {
+            exit(1);
+        }
+
+        pprintf("About to scatter adj\n");
+        // we want to scatter. Since we store the matrix in row-major form, we can just
+        // take chunks of the adjacency matrix
+        int scatter_res = MPI_Scatter(adj_matrix->arr,
+                    nodes_per_proc * n_nodes,
+                    MPI_INT,
+                    per_node_matrix->arr,
+                    nodes_per_proc * n_nodes,
+                    MPI_INT,
+                    0,
+                    MPI_COMM_WORLD);
+        pprintf("Scattered adj\n");
+        if (scatter_res) {
+            pprintf("Error when scattering!\n");
+        }
+    }
 
     // function signatures should look like
     // int shortest_path(adj_matrix, n_nodes, source, WEIGHT *distances, int **paths)
@@ -57,11 +98,13 @@ int main(int argc, char **argv) {
 
     //print_array(adj_matrix, n_nodes);
 
+    // each node has its own predecessors and distances arrays
     size_t *dijkstra_predecessors = calloc(nodes_per_proc, sizeof(size_t));
 
     WEIGHT *dijkstra_distances = calloc(nodes_per_proc, sizeof(WEIGHT));
 
 
+    pprintf("About to call parallel dijkstra\n");
     timing(&start_wall, &cpu);
     parallel_dijkstra(adj_matrix,
                     n_nodes,
@@ -71,39 +114,51 @@ int main(int argc, char **argv) {
                     dijkstra_predecessors);
 
     timing(&end_wall, &cpu);
-    printf("Dijkstra's time: %.4f\n", end_wall - start_wall);
+    pprintf("Dijkstra's time: %.4f\n", end_wall - start_wall);
 
-    WEIGHT *serial_distances = calloc(n_nodes, sizeof(WEIGHT));
+    // now we gather the results
+    MPI_Gather(dijkstra_distances, nodes_per_proc, MPI_INT, global_distances, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
+    // and now we have the global distances!
+    pprintf("DISTANCES!\n");
+    for(int i = 0; i < n_nodes; i++) {
+        pprintf("%d ", global_distances[i]);
+    }
+    pprintf("\n");
 
-    timing(&start_wall, &cpu);
-    serial_dijkstra(adj_matrix,
-                    n_nodes,
-                    n_edges,
-                    0,
-                    serial_distances,
-                    serial_predecessors);
+    /*WEIGHT *serial_distances = calloc(n_nodes, sizeof(WEIGHT));*/
 
-    timing(&end_wall, &cpu);
-    printf("BF's time: %.4f\n", end_wall - start_wall);
+    /*timing(&start_wall, &cpu);*/
+    /*serial_dijkstra(adj_matrix,*/
+                    /*n_nodes,*/
+                    /*n_edges,*/
+                    /*0,*/
+                    /*serial_distances,*/
+                    /*serial_predecessors);*/
+
+    /*timing(&end_wall, &cpu);*/
+    /*printf("BF's time: %.4f\n", end_wall - start_wall);*/
 
     // use the serial version to verify results
 
-    double l2 = l2_norm(dijkstra_distances, serial_distances, n_nodes);
-    printf("\n\nL2 Norm: %lf\n", l2);
+    /*double l2 = l2_norm(dijkstra_distances, serial_distances, n_nodes);*/
+    /*printf("\n\nL2 Norm: %lf\n", l2);*/
 
     ///////////////////////////////////////////////////////////////////////////
     ///  CLEAN UP
     ///////////////////////////////////////////////////////////////////////////
     free(dijkstra_predecessors);
-    free(serial_predecessors);
+    /*free(serial_predecessors);*/
     free(dijkstra_distances);
-    free(serial_distances);
-    free_array(adj_matrix, n_nodes);
+    /*free(serial_distances);*/
+    flat_matrix_free(adj_matrix);
+    flat_matrix_free(per_node_matrix);
+
+    MPI_Finalize();
 
     return 0;
 }
 
-int parallel_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+int parallel_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
     // same thing as serial, except...
     // 1. Each processor gets assigned a "cluster" of nodes and maintains their own min heap
     //      WE WILL ASSUME THAT THE NUMBER OF PROCESSORS DIVIDES THE NUMBER OF NODES
@@ -121,13 +176,102 @@ int parallel_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_
 
     // now we get our cluster.
     // ASSUME that num_procs | n_nodes
-    int nodes_per_proc = n_nodes / n_procs;
-    int cluster_start = rank * nodes_per_proc;
+    size_t nodes_per_proc = n_nodes / n_procs;
+    size_t offset = nodes_per_proc * rank;
 
-    // each node should have
+
+    // buffers for the keys/vals for the min select
+    WEIGHT *gather_vals = calloc(n_procs, sizeof(WEIGHT));
+    WEIGHT *gather_keys = calloc(n_procs, sizeof(size_t));
 
     MQNode **mqns = malloc(nodes_per_proc * sizeof(MQNode)); // oh boy
-    if (src - cluster_start > 0 && src - cluster_start < nodes_per_proc) {
+    MinQueue *mq = mqueue_init(nodes_per_proc);
+
+    // Everything stored in the min queue is in global terms
+    // initialize all of the distances into the min queue
+    for (size_t v = 0; v < nodes_per_proc; v++) {
+        // each node keeps track of its own min queue
+        if (v + offset == src) {
+            distances[src - offset] = 0;
+        } else {
+            distances[v] = INT_MAX;
+        }
+        predecessors[v] = -1;
+        MQNode *mqn = malloc(sizeof(MQNode));
+        mqns[v] = mqn;
+        mqn->key = v + offset;
+        mqn->val = distances[v];
+        mqueue_insert(mq, mqn);
     }
+
+    while (1) {
+        // now we get the global min. Each one checks its local min
+        MQNode *local_min = mqueue_pop_min(mq);
+        // if the node is empty, we will send -1, -1
+        if (local_min == NULL) {
+            local_min = &DUMMY;
+        }
+
+
+        pprintf("About to allgather\n");
+        // now we do allgather. Once for the keys and once for the vals
+        MPI_Allgather(&local_min->key, 1, MPI_LONG, gather_keys, 1, MPI_LONG, MPI_COMM_WORLD);
+        MPI_Allgather(&local_min->val, 1, MPI_INT, gather_vals, 1, MPI_INT, MPI_COMM_WORLD);
+        pprintf("Allgathered\n");
+
+        // now we get the local min. To ensure consistency, we pick the min from the latest
+        // process if there are ties.
+        int min_proc = 0;
+        WEIGHT min_val = gather_vals[0];
+        for (int i = 1; i < n_procs; i++) {
+            if (gather_vals[i] != -1 && gather_vals[i] <= min_val) {
+                min_proc= i;
+                min_val = gather_vals[i];
+            }
+        }
+        size_t min_node = gather_keys[min_proc];
+
+        // check if we have nothing left
+        if (min_val == -1) {
+            break;
+        }
+
+        // reinsert if we didn't choose our own to be the min
+        if (min_proc != rank) {
+            mqueue_insert(mq, local_min);
+        } else {
+            // otherwise we update the distances thing
+            distances[min_node - offset] = min_val;
+        }
+
+        // now each proc updates their own mqueue based on the min val that was chosen
+        for (int i = 0; i < nodes_per_proc; i++) {
+            pprintf("i, min_node %d, %d\n", i, min_node);
+            if (!flat_matrix_get(adj_matrix, i, min_node)) {
+                continue;
+            }
+            size_t alt_dist = min_val + flat_matrix_get(adj_matrix, i, min_node);
+            // debugf("For node %d, alt_dist %ld, distances %d, adj_matrix %d\n", n, alt_dist, distances[n], flat_matrix_get(adj_matrix, n, v));
+            if (min_val != INT_MAX && alt_dist < distances[i]) {
+                distances[i] = (WEIGHT) alt_dist;
+                predecessors[i] = min_node; // this will be globally indexed
+                pprintf("Updating node %d distance to %d\n", i + offset, alt_dist);
+                mqueue_update_val(mq, mqns[i], alt_dist);
+            }
+        }
+        pprintf("Bottom of loop\n");
+
+    }
+
+    //////////////////////////////////////////////////////////////
+    // CLEANUP
+    //////////////////////////////////////////////////////////////
+    free(gather_keys);
+    free(gather_vals);
+    mqueue_free(mq, 0);
+    for (int i = 0; i < nodes_per_proc; i++) {
+        free(mqns[i]);
+    }
+    free(mqns);
 
 }

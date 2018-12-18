@@ -1,13 +1,14 @@
 #include "benchmarks.h"
 
 // returns 0 on success, -1 on failure for whatever reason.
-int serial_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+int serial_dijkstra(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
     // first we need a distance vector type thing
     MQNode **mqns = malloc(n_nodes * sizeof(MQNode)); // oh boy
     distances[src] = 0;
 
     MinQueue *mq = mqueue_init(n_nodes);
 
+    // initialize all of the distances into the min queue
     for (size_t v = 0; v < n_nodes; v++) {
         if (v != src) {
             distances[v] = INT_MAX;  // doesn't feel too kosher but we're going with it
@@ -24,12 +25,12 @@ int serial_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t 
         MQNode *mqn = mqueue_pop_min(mq);
         size_t v = mqn->key;
         debugf("Popped node %d with distance %d\n", v, distances[v]);
-        for (size_t n = 0; n < n_nodes; n++) {
-            if (!adj_matrix[n][v]) {
+        for (size_t n = 0; n < n_nodes; n++) { // iterate through each neighbor of that node
+            if (!flat_matrix_get(adj_matrix, n, v)) {
                 continue;
             }
-            size_t alt_dist = distances[v] + adj_matrix[n][v];
-            debugf("For node %d, alt_dist %ld, distances %d, adj_matrix %d\n", n, alt_dist, distances[n], adj_matrix[n][v]);
+            size_t alt_dist = distances[v] + flat_matrix_get(adj_matrix, n, v);
+            debugf("For node %d, alt_dist %ld, distances %d, adj_matrix %d\n", n, alt_dist, distances[n], flat_matrix_get(adj_matrix, n, v));
             if (distances[v] != INT_MAX && alt_dist < distances[n]) {
                 distances[n] = (WEIGHT) alt_dist;
                 predecessors[n] = v;
@@ -42,13 +43,13 @@ int serial_dijkstra(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t 
     ///////////////////////////////////////////////////////////////////
     // CLEAN UP
     ///////////////////////////////////////////////////////////////////
-    mqueue_free(mq, 1);
+    mqueue_free(mq, 0);
     free(mqns);
     return 0;
 }
 
 // returns 0 on success, -1 on failure for whatever reason.
-int serial_bellman_ford(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
+int serial_bellman_ford(FlatMatrix *adj_matrix, size_t n_nodes, size_t n_edges, size_t src, WEIGHT *distances, size_t *predecessors) {
     // preprocess once to convert adjacency matrix to edge list
     typedef struct {
         size_t n1;
@@ -61,8 +62,8 @@ int serial_bellman_ford(WEIGHT **adj_matrix, size_t n_nodes, size_t n_edges, siz
     size_t e_i = 0;
     for (size_t i = 0; i < n_nodes; i++) {
         for (size_t j = i; j < n_nodes; j++) {
-            if (adj_matrix[i][j]) {
-                Edge e = {i, j, adj_matrix[i][j]};
+            if (flat_matrix_get(adj_matrix, i, j)) {
+                Edge e = {i, j, flat_matrix_get(adj_matrix, i, j)};
                 edges[e_i++] = e;
             }
             if (e_i == n_edges) break;

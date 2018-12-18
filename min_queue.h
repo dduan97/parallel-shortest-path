@@ -8,7 +8,7 @@ typedef struct {
     size_t key;
     WEIGHT val;
     size_t idx;
-} MQNode;
+} __attribute__((__packed__)) MQNode;
 
 // this will be a key-value store.
 typedef struct {

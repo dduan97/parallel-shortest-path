@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
     size_t n_edges = atoi(argv[2]);
     int max_weight = atoi(argv[3]);
 
-    WEIGHT **adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
+    FlatMatrix *adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
     if (adj_matrix == NULL) {
         exit(1);
     }
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
     free(bf_predecessors);
     free(dijkstra_distances);
     free(bf_distances);
-    free_array(adj_matrix, n_nodes);
+    flat_matrix_free(adj_matrix);
 
     return 0;
 }

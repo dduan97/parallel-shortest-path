@@ -4,7 +4,7 @@
 // right now we're using integer weights
 #include "helpers.h"
 
-WEIGHT **gen_graph(size_t n_nodes, size_t n_edges, int max_weight) {
+FlatMatrix *gen_graph(size_t n_nodes, size_t n_edges, int max_weight) {
 
     if (n_edges > (n_nodes) * (n_nodes - 1) / 2) {
         printf("Too many edges!\n");
@@ -12,10 +12,7 @@ WEIGHT **gen_graph(size_t n_nodes, size_t n_edges, int max_weight) {
     }
     srand(SEED);
     // initialize the adjacency matrix as a 2-D array
-    WEIGHT **adj_matrix = malloc(n_nodes * sizeof(WEIGHT*));
-    for (size_t i = 0; i < n_nodes; i++) {
-        adj_matrix[i] = calloc(n_nodes, sizeof(WEIGHT));
-    }
+    FlatMatrix *adj_matrix = flat_matrix_init(n_nodes, n_nodes);
 
     // now we randomly select the adjacencies to put in the matrix
     size_t e = 0;
@@ -27,14 +24,15 @@ WEIGHT **gen_graph(size_t n_nodes, size_t n_edges, int max_weight) {
 
         // don't want to repeat an edge or put an edge between the same nodes
         if (n1 == n2
-                || adj_matrix[n1][n2] != 0) {
+                || flat_matrix_get(adj_matrix, n1, n2) != 0) {
             continue;
         }
 
         // generate the weights, from 1 til max_weight (inclusive)
         WEIGHT weight = (WEIGHT) (rand() * 1.0 / RAND_MAX * max_weight) + 1;
 
-        adj_matrix[n1][n2] = adj_matrix[n2][n1] = weight;
+        flat_matrix_set(adj_matrix, n1, n2, weight);
+        flat_matrix_set(adj_matrix, n2, n1, weight);
         e++;
     }
 
@@ -42,23 +40,23 @@ WEIGHT **gen_graph(size_t n_nodes, size_t n_edges, int max_weight) {
 }
 
 
-// function for pretty printing a square 2-d array
-void print_array(WEIGHT**arr, size_t dim) {
-    for (size_t i = 0; i < dim; i++) {
-        for (size_t j = 0; j < dim; j++) {
-            printf("%4d ", arr[i][j]);
-        }
-        printf("\n");
-    }
-}
+/*// function for pretty printing a square 2-d array*/
+/*void print_array(WEIGHT**arr, size_t dim) {*/
+    /*for (size_t i = 0; i < dim; i++) {*/
+        /*for (size_t j = 0; j < dim; j++) {*/
+            /*printf("%4d ", arr[i][j]);*/
+        /*}*/
+        /*printf("\n");*/
+    /*}*/
+/*}*/
 
 
-void free_array(WEIGHT**arr, size_t dim) {
-    for (size_t i = 0; i < dim; i++) {
-        free(arr[i]);
-    }
-    free(arr);
-}
+/*void free_array(WEIGHT**arr, size_t dim) {*/
+    /*for (size_t i = 0; i < dim; i++) {*/
+        /*free(arr[i]);*/
+    /*}*/
+    /*free(arr);*/
+/*}*/
 
 
 /// TIMING ROUTINES
