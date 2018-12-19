@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+
     debug_init();
 
     int n_nodes = atoi(argv[1]);
@@ -59,8 +60,6 @@ int main(int argc, char **argv) {
     WEIGHT *global_distances = NULL;
     int *global_next_hops = NULL;
 
-    pprintf("About to have master generate stuff\n");
-    timing(&start_wall, &cpu);
     // the master proc will generate the graph
     if (rank == 0) {
         // allocate global distances and next_hops
@@ -78,6 +77,9 @@ int main(int argc, char **argv) {
             /*printf("%d ", adj_matrix->arr[i]);*/
         /*}*/
     }
+    MPI_Barrier(MPI_COMM_WORLD);
+    timing(&start_wall, &cpu);
+
     int send_per_proc = nodes_per_proc * n_nodes;
     int *send_buf = (rank == 0) ? adj_matrix->arr : &send_per_proc;
     // we want to scatter. Since we store the matrix in row-major form, we can just
@@ -111,7 +113,6 @@ int main(int argc, char **argv) {
     WEIGHT *dijkstra_distances = calloc(nodes_per_proc, sizeof(WEIGHT));
 
 
-    pprintf("About to call parallel dijkstra\n");
     parallel_dijkstra(per_node_matrix,
                     n_nodes,
                     n_edges,
