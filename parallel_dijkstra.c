@@ -22,7 +22,7 @@ static void pprintf(const char *fmt, ...) {
 
 MQNode DUMMY = {-1, -1, -1};
 
-int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors);
+int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *next_hops);
 
 int main(int argc, char **argv) {
 
@@ -48,23 +48,23 @@ int main(int argc, char **argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &n_procs);
 
     // master proc should split the graph up and distribute to each node
-    // also each proc should have their own version of distances[] and predecessors[]
+    // also each proc should have their own version of distances[] and next_hops[]
 
     // now we get our cluster.
     // ASSUME that num_procs | n_nodes
     int nodes_per_proc = n_nodes / n_procs;
     // each node will have a matrix with nodes_per_proc rows and n_nodes cols
     FlatMatrix *per_node_matrix = flat_matrix_init(n_nodes, nodes_per_proc);
-    // global distances and global predecessors for gathering
+    // global distances and global next_hops for gathering
     WEIGHT *global_distances = NULL;
-    int *global_predecessors = NULL;
+    int *global_next_hops = NULL;
 
     pprintf("About to have master generate stuff\n");
     // the master proc will generate the graph
     if (rank == 0) {
-        // allocate global distances and predecessors
+        // allocate global distances and next_hops
         global_distances = calloc(n_nodes, sizeof(WEIGHT));
-        global_predecessors = calloc(n_nodes, sizeof(int));
+        global_next_hops = calloc(n_nodes, sizeof(int));
 
 
         adj_matrix = gen_graph(n_nodes, n_edges, max_weight);
@@ -104,8 +104,8 @@ int main(int argc, char **argv) {
 
     //print_array(adj_matrix, n_nodes);
 
-    // each node has its own predecessors and distances arrays
-    int *dijkstra_predecessors = calloc(nodes_per_proc, sizeof(int));
+    // each node has its own next_hops and distances arrays
+    int *dijkstra_next_hops = calloc(nodes_per_proc, sizeof(int));
 
     WEIGHT *dijkstra_distances = calloc(nodes_per_proc, sizeof(WEIGHT));
 
@@ -117,26 +117,26 @@ int main(int argc, char **argv) {
                     n_edges,
                     0,
                     dijkstra_distances,
-                    dijkstra_predecessors);
+                    dijkstra_next_hops);
 
     timing(&end_wall, &cpu);
     pprintf("Dijkstra's time: %.4f\n", end_wall - start_wall);
 
     // now we gather the results
     MPI_Gather(dijkstra_distances, nodes_per_proc, MPI_INT, global_distances, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
-    /*MPI_Gather(dijkstra_predecessors, nodes_per_proc, MPI_INT, global_predecessors, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);*/
+    MPI_Gather(dijkstra_next_hops, nodes_per_proc, MPI_INT, global_next_hops, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
 
     // for comparison, get results from serial dijsktra
     if (rank == 0) {
         // save the results
-        int store_res = store_result_soft(SEED, n_nodes, n_edges, max_weight, ALGO_PAR_DIJKSTRA, global_distances, global_predecessors);
+        int store_res = store_result_soft(SEED, n_nodes, n_edges, max_weight, ALGO_PAR_DIJKSTRA, global_distances, global_next_hops);
         if (store_res == -1) {
             printf("Could not store result!\n");
         }
 
         WEIGHT *ser_distances = calloc(n_nodes, sizeof(WEIGHT));
-        int *ser_predecessors = calloc(n_nodes, sizeof(int));
-        int res = read_result(SEED, n_nodes, n_edges, max_weight, ALGO_SER_DIJKSTRA, ser_distances, ser_predecessors);
+        int *ser_next_hops = calloc(n_nodes, sizeof(int));
+        int res = read_result(SEED, n_nodes, n_edges, max_weight, ALGO_SER_DIJKSTRA, ser_distances, ser_next_hops);
         if (res == -1) {
             pprintf("Could not read past result!\n");
         } else {
@@ -159,20 +159,20 @@ int main(int argc, char **argv) {
 
         }
         free(ser_distances);
-        free(ser_predecessors);
+        free(ser_next_hops);
     }
 
     ///////////////////////////////////////////////////////////////////////////
     ///  CLEAN UP
     ///////////////////////////////////////////////////////////////////////////
-    free(dijkstra_predecessors);
-    /*free(serial_predecessors);*/
+    free(dijkstra_next_hops);
+    /*free(serial_next_hops);*/
     free(dijkstra_distances);
     /*free(serial_distances);*/
     if (rank == 0) {
         flat_matrix_free(adj_matrix);
         free(global_distances);
-        free(global_predecessors);
+        free(global_next_hops);
     }
     flat_matrix_free(per_node_matrix);
 
@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *predecessors) {
+int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src, WEIGHT *distances, int *next_hops) {
 
     //pprintf("PER_NODE MATRIX!!!!!\n");
     //flat_matrix_print(adj_matrix);
@@ -222,7 +222,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src,
         } else {
             distances[v] = INT_MAX;
         }
-        predecessors[v] = -1;
+        next_hops[v] = -1;
         MQNode *mqn = malloc(sizeof(MQNode));
         mqns[v] = mqn;
         mqn->key = v + offset;
@@ -280,7 +280,7 @@ int parallel_dijkstra(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int src,
             // debugf("For node %d, alt_dist %ld, distances %d, adj_matrix %d\n", n, alt_dist, distances[n], flat_matrix_get(adj_matrix, n, v));
             if (min_val != INT_MAX && alt_dist < distances[i]) {
                 distances[i] = (WEIGHT) alt_dist;
-                predecessors[i] = min_node; // this will be globally indexed
+                next_hops[i] = min_node; // this will be globally indexed
                 /*pprintf("Updating node %d distance to %d\n", i + offset, alt_dist);*/
                 mqueue_update_val(mq, mqns[i], alt_dist);
             }
