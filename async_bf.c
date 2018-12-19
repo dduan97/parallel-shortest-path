@@ -1,12 +1,16 @@
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <limits.h>
 #include <mpi.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "helpers.h"
 #include "benchmarks.h"
 #include "resultr.h"
 
-#define ITERATIONS_TO_CONVERGE 5
+#define ITERATIONS_TO_CONVERGE 20
+
 
 enum MPI_TAG {
     TAG_KEY,
@@ -113,7 +117,6 @@ int main(int argc, char **argv) {
     WEIGHT *async_bf_distances = calloc(nodes_per_proc, sizeof(WEIGHT));
 
 
-    pprintf("About to call async bf\n");
     timing(&start_wall, &cpu);
     async_bf(adj_matrix,
                     n_nodes,
@@ -132,7 +135,7 @@ int main(int argc, char **argv) {
     // for comparison, get results from serial dijsktra
     if (rank == 0) {
         // save the results
-        int store_res = store_result_soft(SEED, n_nodes, n_edges, max_weight, ALGO_PAR_DIJKSTRA, global_distances, global_next_hops);
+        int store_res = store_result_hard(SEED, n_nodes, n_edges, max_weight, ALGO_ASYNC_BF, global_distances, global_next_hops);
         if (store_res == -1) {
             printf("Could not store result!\n");
         }
@@ -213,9 +216,12 @@ int async_bf(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int dest, WEIGHT 
     // initialize all the distances to infinity
     for (int i = 0; i < nodes_per_proc; i++) {
         if (offset + i == dest) {
+            pprintf("Initializing destination node %d\n", offset + i);
             distances[i] = 0;
+            next_hops[i] = -1;
         } else {
             distances[i] = INT_MAX;
+            next_hops[i] = -1;
         }
     }
 
@@ -226,14 +232,17 @@ int async_bf(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int dest, WEIGHT 
         // in neighbors of node v are at arr[i][v]
         for (int i = 0; i < n_nodes; i++) {
             // check if i is an in neighbor
-            if (flat_matrix_get(adj_matrix, i, v)) {
+            if (flat_matrix_get(adj_matrix, i, v + offset)) {
                 n_in_neighbors[v]++;
             }
-            if (flat_matrix_get(adj_matrix, v, i)) {
+            if (flat_matrix_get(adj_matrix, v + offset, i)) {
                 n_out_neighbors[v]++;
             }
         }
     }
+
+    // each node has global estimates
+    /*WEIGHT **estimates = calloc(nodes_per_proc, sizeof(WEIGHT *));*/
 
 
     int **in_neighbors = calloc(nodes_per_proc, sizeof(int *));
@@ -241,6 +250,7 @@ int async_bf(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int dest, WEIGHT 
 
     // for each node, we also need an array to store the active requests
     MPI_Request **irecv_reqs = calloc(nodes_per_proc, sizeof(MPI_Request *));
+    MPI_Request **isend_reqs = calloc(nodes_per_proc, sizeof(MPI_Request *));
 
     // for each node, we will also have a "new neighbor estimate array"
     // that holds any updated estimates from OUT_NEIGHBORS
@@ -255,16 +265,18 @@ int async_bf(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int dest, WEIGHT 
         downstream_updates[v] = calloc(n_out_neighbors[v], sizeof(WEIGHT));
 
         irecv_reqs[v] = calloc(n_out_neighbors[v], sizeof(MPI_Request));
+        isend_reqs[v] = calloc(n_in_neighbors[v], sizeof(MPI_Request));
 
         int in_idx = 0;
         int out_idx = 0;
         for (int i = 0; i < n_nodes; i++) {
             // check if i is an in neighbor
-            if (flat_matrix_get(adj_matrix, i, v)) {
+            if (flat_matrix_get(adj_matrix, i, v + offset)) {
                 in_neighbors[v][in_idx] = i;
+                isend_reqs[v][in_idx] = calloc(1, sizeof(MPI_Request));
                 in_idx++;
             }
-            if (flat_matrix_get(adj_matrix, v, i)) {
+            if (flat_matrix_get(adj_matrix, v + offset, i)) {
                 out_neighbors[v][out_idx] = i;
                 irecv_reqs[v][out_idx] = calloc(1, sizeof(MPI_Request));
                 out_idx++;
@@ -283,58 +295,66 @@ int async_bf(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int dest, WEIGHT 
             // i is the index in out_neighbors
 
             // alright the tag is gonna be given by
-            // v * n_nodes + n
-            int tag = v * n_nodes + n;
+            // sending from n to v
+            int tag = (v + offset) + n_nodes * n;
             // updates from neighbor n to vertex v will go into downstream_updates[v][n];
-            MPI_Irecv(&(downstream_updates[v][n]), 1, MPI_INT, node, tag, MPI_COMM_WORLD, &req);
+            MPI_Irecv(&(downstream_updates[v][i]), 1, MPI_INT, node, tag, MPI_COMM_WORLD, &req);
         }
     }
 
     // now we can proceed
     int static_iters = 0;
-    pprintf("About to hit loop\n");
-    while (static_iters < ITERATIONS_TO_CONVERGE) {
+    // while (static_iters < ITERATIONS_TO_CONVERGE) {
+    for (int n_iters = 0; n_iters < n_nodes; n_iters++) {
         // check for any updates from downstream and
         // use them to recompute local values
         for (int v = 0; v < nodes_per_proc; v++) {
             for (int i = 0; i < n_out_neighbors[v]; i++) {
-                int n = in_neighbors[v][i];
+                int n = out_neighbors[v][i];
                 int proc = (n / nodes_per_proc);
                 // get the MPI_Request
                 MPI_Request req = irecv_reqs[v][i];
 
                 int flag;
                 MPI_Status status;
-                MPI_Request_get_status(req, &flag, &status);
+                MPI_Test(&req, &flag, &status);
 
                 if (flag) {  // then we have an update
-                    pprintf("Got update from proc %d node %d\n", proc, n);
 
                     // check the value of the downstream updates
                     int new_est = downstream_updates[v][i];
-                    int edge_weight = flat_matrix_get(adj_matrix, v, n);
+                    pprintf("Node %d got update from proc %d node %d (new_est %d)\n", v + offset, proc, n, new_est);
+                    int edge_weight = flat_matrix_get(adj_matrix, v + offset, n);
                     if (new_est != INT_MAX && new_est + edge_weight < distances[v]) {
                         distances[v] = new_est + edge_weight;
+                        next_hops[v] = n;
                         has_local_update = 1;
                     }
 
                     // and now we reopen the irecv
 
-                    int tag = v * n_nodes + n;
-                    MPI_Irecv(&(downstream_updates[v][n]), 1, MPI_INT, proc, tag, MPI_COMM_WORLD, &req);
+                    memset(&req, 0, sizeof(MPI_Request));
+                    int tag = (v + offset) + n_nodes * n;
+                    MPI_Irecv(&(downstream_updates[v][i]), 1, MPI_INT, proc, tag, MPI_COMM_WORLD, &req);
                 }
 
             }
 
             if (has_local_update) {
                 static_iters = 0;
-                // TODO: send the update
-                for (int i = 0; i < n_out_neighbors[v]; i++) {
-                    int n = out_neighbors[v][i];
+                for (int i = 0; i < n_in_neighbors[v]; i++) {
+                    MPI_Request req = isend_reqs[v][i];
+                    int n = in_neighbors[v][i];
                     int proc = (n / nodes_per_proc);
-                    int tag = v * n_nodes + n;
-                    pprintf("sending update to proc %d node %d\n", proc, n);
-                    MPI_Isend(&distances[v], 1, MPI_INT, proc, tag, MPI_COMM_WORLD, &dummy_req);
+                    int tag = (v + offset) * n_nodes + n;
+                    pprintf("Node %d sending updated estimate %d to proc %d\n", v + offset, distances[v], proc);
+
+                    int flag;
+                    MPI_Status status;
+                    MPI_Request_get_status(req, &flag, &status);
+                    if (!flag) pprintf("Past send not complete!\n");
+
+                    MPI_Isend(&distances[v], 1, MPI_INT, proc, tag, MPI_COMM_WORLD, &req);
                 }
                 has_local_update = 0;
             } else {
@@ -343,10 +363,12 @@ int async_bf(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int dest, WEIGHT 
 
         }
 
+        usleep(100000);
+        MPI_Barrier(MPI_COMM_WORLD);
     }
 
     // then we put a barrier here to make sure everyone returns at the same time
-    MPI_Barrier(MPI_COMM_WORLD);
+    /*MPI_Barrier(MPI_COMM_WORLD);*/
 
     //////////////////////////////////////////////////////////////
     // CLEANUP
@@ -359,12 +381,17 @@ int async_bf(FlatMatrix *adj_matrix, int n_nodes, int n_edges, int dest, WEIGHT 
         for (int j = 0; j < n_out_neighbors[i]; j++) {
             free(irecv_reqs[i][j]);
         }
+        for (int j = 0; j < n_in_neighbors[i]; j++) {
+            free(isend_reqs[i][j]);
+        }
         free(irecv_reqs[i]);
+        free(isend_reqs[i]);
     }
     free(in_neighbors);
     free(out_neighbors);
     free(downstream_updates);
     free(irecv_reqs);
+    free(isend_reqs);
     free(n_in_neighbors);
     free(n_out_neighbors);
 

@@ -60,6 +60,7 @@ int main(int argc, char **argv) {
     int *global_next_hops = NULL;
 
     pprintf("About to have master generate stuff\n");
+    timing(&start_wall, &cpu);
     // the master proc will generate the graph
     if (rank == 0) {
         // allocate global distances and next_hops
@@ -111,7 +112,6 @@ int main(int argc, char **argv) {
 
 
     pprintf("About to call parallel dijkstra\n");
-    timing(&start_wall, &cpu);
     parallel_dijkstra(per_node_matrix,
                     n_nodes,
                     n_edges,
@@ -119,13 +119,12 @@ int main(int argc, char **argv) {
                     dijkstra_distances,
                     dijkstra_next_hops);
 
-    timing(&end_wall, &cpu);
-    pprintf("Dijkstra's time: %.4f\n", end_wall - start_wall);
 
     // now we gather the results
     MPI_Gather(dijkstra_distances, nodes_per_proc, MPI_INT, global_distances, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Gather(dijkstra_next_hops, nodes_per_proc, MPI_INT, global_next_hops, nodes_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
-
+    timing(&end_wall, &cpu);
+    pprintf("Dijkstra's time: %.4f\n", end_wall - start_wall);
     // for comparison, get results from serial dijsktra
     if (rank == 0) {
         // save the results

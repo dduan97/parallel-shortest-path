@@ -1,7 +1,7 @@
 #ifndef __HELPERS_H__
 #define __HELPERS_H__
 
-#define SEED 21897
+#define SEED 2017
 
 #include <stdlib.h>
 #include <stdarg.h>
@@ -12,6 +12,7 @@
 #include <sys/resource.h>
 
 #include "flat_matrix.h"
+#include "resultr.h"
 
 static int DEBUG_MODE = 0;
 

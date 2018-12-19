@@ -36,6 +36,9 @@ FlatMatrix *gen_graph(int n_nodes, unsigned long n_edges, int max_weight) {
         e++;
     }
 
+    // write this out
+    store_matrix_soft(SEED, n_nodes, n_edges, max_weight, adj_matrix);
+
     return adj_matrix;
 }
 
