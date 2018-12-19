@@ -26,6 +26,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    //flat_matrix_print(adj_matrix);
+
 
     // function signatures should look like
     // int shortest_path(adj_matrix, n_nodes, source, WEIGHT *distances, int **paths)

@@ -3,10 +3,10 @@
 // don't think we need more than that
 int KEY_LEN = 64;
 const char *dist_fmt = "%d ";
-const char *pred_fmt = "%zd ";
+const char *pred_fmt = "%d ";
 
 static int get_filename(char *buf, int seed, int n_nodes, int n_edges, int max_weight, ALGORITHM algo) {
-    return sprintf(buf, "./results/%d_%d_%d_%d_%d.results", seed, n_nodes, n_edges, max_weight, algo);
+    return sprintf(buf, "./results/%d_%d_%d_%d_%d.results", n_nodes, n_edges, max_weight, algo, seed);
 }
 
 static int results_to_file(char *filename, int n_nodes, WEIGHT *distances, int *predecessors) {

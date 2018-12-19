@@ -6,7 +6,7 @@
 
 FlatMatrix *gen_graph(int n_nodes, unsigned long n_edges, int max_weight) {
 
-    unsigned long max_edges = (n_nodes - 1) * n_nodes / 2;
+    unsigned long max_edges = (n_nodes - 1) * n_nodes; // max number of DIRECTED edges
     if (n_edges > max_edges) {
         printf("Too many edges!\n");
         return NULL;
@@ -33,7 +33,6 @@ FlatMatrix *gen_graph(int n_nodes, unsigned long n_edges, int max_weight) {
         WEIGHT weight = (WEIGHT) (rand() * 1.0 / RAND_MAX * max_weight) + 1;
 
         flat_matrix_set(adj_matrix, n1, n2, weight);
-        flat_matrix_set(adj_matrix, n2, n1, weight);
         e++;
     }
 
